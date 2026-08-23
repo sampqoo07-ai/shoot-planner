@@ -28,6 +28,7 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  .hidden{display:none !important;}
   body{
     font-family:"Noto Sans TC", -apple-system, sans-serif;
     background:var(--bg);
@@ -214,6 +215,59 @@
   }
   .checkbox-round.checked{background:var(--sage); border-color:var(--sage); color:#fff;}
 
+  /* ---------- ideas (內容發想) ---------- */
+  .idea-card{
+    background:#fff; border:1px solid var(--light-blue); border-radius:var(--radius);
+    padding:15px; margin-bottom:12px; box-shadow:var(--shadow);
+  }
+  .idea-card-head{display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
+  .idea-card .topic{font-size:15.5px; font-weight:700;}
+  .idea-card .field-row{margin-top:10px; font-size:13px; line-height:1.55;}
+  .idea-card .field-label{font-size:11px; color:var(--gray); font-weight:700; letter-spacing:0.5px; margin-bottom:2px;}
+  .idea-card .field-text{color:var(--medium); white-space:pre-wrap;}
+  .idea-card-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .resource-chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+  .resource-chip{
+    display:inline-flex; align-items:center; gap:5px; max-width:100%;
+    background:var(--light-blue); color:#3B5568; border-radius:999px;
+    padding:5px 12px; font-size:12px; font-weight:700; text-decoration:none;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .resource-chip.type-image{background:var(--light-yellow); color:#7A6316;}
+  .resource-chip.type-article{background:var(--light-sage); color:#3E5B3F;}
+
+  .ai-box{
+    background:var(--light-yellow); border:1px solid var(--yellow);
+    border-radius:var(--radius-sm); padding:14px; margin-bottom:16px;
+  }
+  .ai-box .ai-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .ai-box .ai-row input, .ai-box .ai-row select{
+    border:1px solid var(--soft-blue); border-radius:var(--radius-sm);
+    padding:8px 10px; font-size:13px; background:#fff; color:var(--dark);
+  }
+  .ai-box .ai-hint{font-size:11.5px; color:var(--medium); margin-top:8px; line-height:1.6;}
+  .ai-box .ai-hint a{color:var(--blue); font-weight:700;}
+  .ai-status{font-size:12.5px; margin-top:8px; display:none;}
+  .ai-status.show{display:block;}
+  .ai-status.error{color:var(--danger);}
+  .ai-status.loading{color:var(--medium);}
+
+  .resource-row{
+    display:flex; gap:6px; margin-bottom:8px; align-items:center; flex-wrap:wrap;
+  }
+  .resource-row select{
+    border:1px solid var(--soft-blue); border-radius:var(--radius-sm);
+    padding:9px 8px; font-size:12.5px; background:var(--cream); color:var(--dark); flex-shrink:0;
+  }
+  .resource-row input{
+    border:1px solid var(--soft-blue); border-radius:var(--radius-sm);
+    padding:9px 10px; font-size:13px; background:var(--cream); color:var(--dark); flex:1; min-width:100px;
+  }
+  .resource-row-remove{
+    background:var(--light-danger); color:var(--danger); border:none;
+    width:28px; height:28px; border-radius:50%; font-size:14px; flex-shrink:0;
+  }
+
   /* ---------- overlay / modal ---------- */
   .overlay{
     position:fixed; inset:0; background:rgba(55,53,47,0.45);
@@ -277,7 +331,7 @@
 </head>
 <body>
 
-<div id="app">
+<div id="app" class="hidden">
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
@@ -288,18 +342,51 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <span id="syncStatus" style="font-size:11.5px; color:var(--medium); align-self:center;"></span>
         <button id="btnBackup" class="btn btn-ghost">📦 備份</button>
         <button id="btnAdd" class="btn btn-primary">＋ 新增影片</button>
       </div>
     </div>
     <nav class="tabnav">
       <button class="tab-btn" data-view="dashboard">總覽儀表板</button>
+      <button class="tab-btn" data-view="ideas">內容發想</button>
       <button class="tab-btn" data-view="calendar">拍片行事曆</button>
       <button class="tab-btn" data-view="list">影片清單</button>
     </nav>
   </header>
 
   <main id="mainContent" class="main"></main>
+</div>
+
+<!-- 登入 / 註冊 -->
+<div id="authOverlay" class="overlay">
+  <div class="modal modal-sm">
+    <div id="authLoadingState">
+      <p style="text-align:center; padding:30px 10px; color:var(--medium); font-size:13.5px;">連線中...</p>
+    </div>
+    <div id="authFormState" style="display:none;">
+      <div class="modal-head">
+        <h3 id="authTitle">登入你的拍片排程本</h3>
+      </div>
+      <p class="backup-desc">用 Email 建立一組帳號，電腦、手機登入同一組帳號就能看到一樣的排程內容。</p>
+      <div class="form-group">
+        <label for="auth_email">Email</label>
+        <input type="text" id="auth_email" placeholder="you@example.com" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="auth_password">密碼</label>
+        <input type="password" id="auth_password" placeholder="至少 6 個字元" autocomplete="current-password">
+      </div>
+      <p id="authError" style="display:none; color:var(--danger); font-size:12.5px; margin-bottom:10px; line-height:1.5;"></p>
+      <div class="form-actions">
+        <button type="button" id="authSubmitBtn" class="btn btn-primary" style="flex:1;">登入</button>
+      </div>
+      <p style="text-align:center; font-size:12.5px; margin-top:16px; color:var(--medium);">
+        <span id="authToggleText">還沒有帳號？</span>
+        <button type="button" id="authToggleMode" style="background:none; border:none; padding:0; color:var(--blue); font-weight:700; text-decoration:underline;">建立新帳號</button>
+      </p>
+    </div>
+  </div>
 </div>
 
 <!-- 新增／編輯表單 -->
@@ -349,6 +436,62 @@
   </div>
 </div>
 
+<!-- 內容發想：新增／編輯靈感 -->
+<div id="ideaOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="ideaFormTitle">新增一則靈感</h3>
+      <button class="modal-close" id="ideaCloseBtn">✕</button>
+    </div>
+    <form id="ideaForm">
+      <div class="form-group">
+        <label for="i_topic">主題／靈感</label>
+        <input type="text" id="i_topic" placeholder="例如：外食族午餐怎麼挑才不會胖" required>
+      </div>
+
+      <div class="ai-box">
+        <div class="ai-row">
+          <input type="password" id="ai_apiKey" placeholder="貼上你的 Anthropic API Key（sk-ant-...）" style="flex:1; min-width:180px;">
+          <select id="ai_model">
+            <option value="claude-sonnet-5">Claude Sonnet 5（品質較佳）</option>
+            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5（較快較省）</option>
+          </select>
+        </div>
+        <div class="ai-row" style="margin-top:8px;">
+          <button type="button" id="aiGenerateBtn" class="btn btn-primary btn-sm">🪄 用 AI 幫我寫 Hook／內容／CTA</button>
+        </div>
+        <p id="aiStatus" class="ai-status"></p>
+        <p class="ai-hint">API Key 只會存在你這台裝置的瀏覽器裡，會直接從瀏覽器呼叫 Anthropic API，不會經過任何其他伺服器。還沒有 Key 的話可以到 <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> 申請。</p>
+      </div>
+
+      <div class="form-group">
+        <label for="i_hook">開頭 3 秒 Hook</label>
+        <textarea id="i_hook" placeholder="按上面「用 AI 幫我寫」自動產生，或自己輸入"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="i_content">影片主軸內容</label>
+        <textarea class="tall" id="i_content" placeholder="按上面「用 AI 幫我寫」自動產生，或自己輸入"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="i_cta">結尾 CTA</label>
+        <textarea id="i_cta" placeholder="按上面「用 AI 幫我寫」自動產生，或自己輸入"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>參考資源 <span class="hint">— 連結／圖片／文章都可以存放在這裡</span></label>
+        <div id="resourceRows"></div>
+        <button type="button" id="addResourceBtn" class="btn btn-ghost btn-sm">＋ 新增資源連結</button>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" id="ideaDeleteBtn" class="btn btn-danger" style="display:none;">刪除</button>
+        <button type="button" id="ideaCancelBtn" class="btn btn-ghost">取消</button>
+        <button type="submit" class="btn btn-primary">儲存靈感</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- 備份匯出匯入 -->
 <div id="backupOverlay" class="overlay hidden">
   <div class="modal modal-sm">
@@ -356,42 +499,229 @@
       <h3>資料備份</h3>
       <button class="modal-close" id="backupCloseBtn">✕</button>
     </div>
-    <p class="backup-desc">所有資料都只存在這台裝置的瀏覽器裡。換電腦、換手機，或不小心清除瀏覽器資料前，記得先匯出備份檔。</p>
+    <p class="backup-desc" id="currentUserEmail"></p>
+    <p class="backup-desc">資料會即時同步到雲端，電腦、手機用同一組帳號登入就能看到一樣的排程。這裡的匯出／匯入是額外的備份保險。</p>
     <div class="backup-row">
       <button id="exportBtn" class="btn btn-sage">⬇ 匯出備份檔</button>
     </div>
     <div class="backup-row">
       <button id="importBtn" class="btn btn-ghost">⬆ 匯入備份檔</button>
     </div>
-    <p class="backup-desc" style="margin-top:4px;">匯入會覆蓋目前裝置上的所有資料，請先確認再匯入。</p>
+    <p class="backup-desc" style="margin-top:4px;">匯入會覆蓋雲端目前的所有資料，請先確認再匯入。</p>
+    <div class="backup-row" style="margin-top:14px; border-top:1px solid var(--light-blue); padding-top:14px;">
+      <button id="logoutBtn" class="btn btn-ghost">🚪 登出帳號</button>
+    </div>
   </div>
 </div>
 <input type="file" id="importFile" accept="application/json" hidden>
 
 <div id="toast" class="toast hidden"></div>
 
+<!-- Firebase（雲端同步用，需自行在下方填入你的 firebaseConfig） -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+
 <script>
 (function(){
   "use strict";
-  var STORAGE_KEY = "reelsPlanner_videos_v1";
   var REMINDER_KEY = "reelsPlanner_lastReminderDate";
   var WEEKDAYS = ["日","一","二","三","四","五","六"];
 
-  /* ---------------- data layer ---------------- */
-  function loadVideos(){
-    try{
-      var raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    }catch(e){ return []; }
-  }
-  function saveVideos(list){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  /* ---------------- Firebase 設定 ----------------
+     請到 Firebase 主控台 → 專案設定 → 一般 → 你的應用程式，
+     把設定值貼到下面對應的欄位（不要留中文提示文字）。
+  ------------------------------------------------ */
+  var firebaseConfig = {
+    apiKey: "請貼上你的 apiKey",
+    authDomain: "你的專案.firebaseapp.com",
+    projectId: "你的專案ID",
+    storageBucket: "你的專案.appspot.com",
+    messagingSenderId: "你的messagingSenderId",
+    appId: "你的appId"
+  };
+
+  var auth = null;
+  var db = null;
+  var currentUser = null;
+  var unsubscribeVideos = null;
+  var unsubscribeIdeas = null;
+  var authMode = "login";
+
+  function isConfigFilled(){
+    return firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("請貼上") === -1;
   }
   function genId(){
     return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   }
 
-  var videos = loadVideos();
+  var videos = [];
+  var ideas = [];
+
+  /* ---------------- 登入 / 註冊 ---------------- */
+  function showAuthLoading(msg){
+    document.getElementById("authOverlay").classList.remove("hidden");
+    document.getElementById("authLoadingState").style.display = "";
+    document.getElementById("authFormState").style.display = "none";
+    if(msg) document.getElementById("authLoadingState").innerHTML =
+      '<p style="text-align:center; padding:20px 10px; color:var(--medium); font-size:13.5px; line-height:1.6;">' + msg + '</p>';
+  }
+  function showAuthForm(){
+    document.getElementById("authOverlay").classList.remove("hidden");
+    document.getElementById("authLoadingState").style.display = "none";
+    document.getElementById("authFormState").style.display = "";
+    document.getElementById("app").classList.add("hidden");
+  }
+  function showApp(){
+    document.getElementById("authOverlay").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    var emailEl = document.getElementById("currentUserEmail");
+    if(emailEl && currentUser) emailEl.textContent = "目前登入帳號：" + currentUser.email;
+  }
+  function setSyncStatus(text){
+    var el = document.getElementById("syncStatus");
+    if(el) el.textContent = text;
+  }
+  function updateAuthUI(){
+    var title = document.getElementById("authTitle");
+    var submitBtn = document.getElementById("authSubmitBtn");
+    var toggleText = document.getElementById("authToggleText");
+    var toggleBtn = document.getElementById("authToggleMode");
+    var errEl = document.getElementById("authError");
+    errEl.style.display = "none";
+    if(authMode === "login"){
+      title.textContent = "登入你的拍片排程本";
+      submitBtn.textContent = "登入";
+      toggleText.textContent = "還沒有帳號？";
+      toggleBtn.textContent = "建立新帳號";
+    }else{
+      title.textContent = "建立新帳號";
+      submitBtn.textContent = "註冊並登入";
+      toggleText.textContent = "已經有帳號了？";
+      toggleBtn.textContent = "直接登入";
+    }
+  }
+  function translateAuthError(code){
+    var map = {
+      "auth/invalid-email": "Email 格式不正確",
+      "auth/user-not-found": "找不到這個帳號，要不要改成「建立新帳號」？",
+      "auth/wrong-password": "密碼不正確",
+      "auth/invalid-credential": "帳號或密碼不正確",
+      "auth/email-already-in-use": "這個 Email 已經註冊過了，改成登入試試",
+      "auth/weak-password": "密碼太簡單，至少要 6 個字元",
+      "auth/network-request-failed": "網路連線失敗，請檢查網路後再試一次",
+      "auth/too-many-requests": "嘗試次數過多，請稍後再試"
+    };
+    return map[code] || ("發生錯誤：" + code);
+  }
+
+  function initAuthUI(){
+    document.getElementById("authToggleMode").addEventListener("click", function(){
+      authMode = authMode === "login" ? "register" : "login";
+      updateAuthUI();
+    });
+    document.getElementById("authSubmitBtn").addEventListener("click", function(){
+      var email = document.getElementById("auth_email").value.trim();
+      var password = document.getElementById("auth_password").value;
+      var errEl = document.getElementById("authError");
+      errEl.style.display = "none";
+      if(!email || !password){
+        errEl.textContent = "請輸入 Email 和密碼";
+        errEl.style.display = "";
+        return;
+      }
+      var action = authMode === "login"
+        ? auth.signInWithEmailAndPassword(email, password)
+        : auth.createUserWithEmailAndPassword(email, password);
+      action.catch(function(err){
+        errEl.textContent = translateAuthError(err.code);
+        errEl.style.display = "";
+      });
+    });
+    document.getElementById("logoutBtn").addEventListener("click", function(){
+      if(confirm("確定要登出嗎？")) auth.signOut();
+    });
+    updateAuthUI();
+  }
+
+  /* ---------------- Firestore 資料層 ---------------- */
+  function videosCollection(){
+    return db.collection("users").doc(currentUser.uid).collection("videos");
+  }
+  function subscribeVideos(){
+    setSyncStatus("🔄 同步中...");
+    if(unsubscribeVideos) unsubscribeVideos();
+    unsubscribeVideos = videosCollection().orderBy("date", "asc").onSnapshot(function(snapshot){
+      videos = snapshot.docs.map(function(doc){
+        var d = doc.data();
+        d.id = doc.id;
+        return d;
+      });
+      setSyncStatus("☁️ 已同步");
+      render();
+    }, function(err){
+      setSyncStatus("⚠️ 同步失敗");
+      console.error(err);
+    });
+  }
+  function addVideoRemote(data){
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    return videosCollection().add(data);
+  }
+  function updateVideoRemote(id, data){
+    return videosCollection().doc(id).update(data);
+  }
+  function deleteVideoRemote(id){
+    return videosCollection().doc(id).delete();
+  }
+
+  function ideasCollection(){
+    return db.collection("users").doc(currentUser.uid).collection("ideas");
+  }
+  function subscribeIdeas(){
+    if(unsubscribeIdeas) unsubscribeIdeas();
+    unsubscribeIdeas = ideasCollection().orderBy("createdAt", "desc").onSnapshot(function(snapshot){
+      ideas = snapshot.docs.map(function(doc){
+        var d = doc.data();
+        d.id = doc.id;
+        return d;
+      });
+      if(state.view === "ideas") render();
+    }, function(err){ console.error(err); });
+  }
+  function addIdeaRemote(data){
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    return ideasCollection().add(data);
+  }
+  function updateIdeaRemote(id, data){
+    return ideasCollection().doc(id).update(data);
+  }
+  function deleteIdeaRemote(id){
+    return ideasCollection().doc(id).delete();
+  }
+
+  function initFirebase(){
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    try{ db.enablePersistence({synchronizeTabs:true}); }catch(e){ /* 部分瀏覽器不支援也沒關係 */ }
+
+    auth.onAuthStateChanged(function(user){
+      if(user){
+        currentUser = user;
+        showApp();
+        subscribeVideos();
+        subscribeIdeas();
+      }else{
+        currentUser = null;
+        if(unsubscribeVideos){ unsubscribeVideos(); unsubscribeVideos = null; }
+        if(unsubscribeIdeas){ unsubscribeIdeas(); unsubscribeIdeas = null; }
+        videos = [];
+        ideas = [];
+        showAuthForm();
+      }
+    });
+  }
 
   /* ---------------- date helpers ---------------- */
   function pad(n){ return n < 10 ? "0"+n : ""+n; }
@@ -459,6 +789,7 @@
       btn.classList.toggle("active", btn.dataset.view === state.view);
     });
     if(state.view === "dashboard") renderDashboard();
+    else if(state.view === "ideas") renderIdeas();
     else if(state.view === "calendar") renderCalendar();
     else renderList();
   }
@@ -554,6 +885,81 @@
     if(goOverdue) goOverdue.addEventListener("click", function(){
       state.view = "list"; state.statusFilter = "overdue"; switchTab("list"); render();
     });
+  }
+
+  /* ---------------- ideas (內容發想) ---------------- */
+  function renderIdeas(){
+    var html = '<div class="panel" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">' +
+      '<div><h3 class="section-title" style="margin-bottom:4px;"><span class="dot"></span>爆款影片發想庫</h3>' +
+      '<p style="font-size:12.5px; color:var(--medium);">先把靈感、AI 幫你寫的腳本、參考資料存起來，想拍的時候再排進行事曆</p></div>' +
+      '<button class="btn btn-primary btn-sm" data-action="add-idea">＋ 新增靈感</button>' +
+    '</div>';
+
+    if(ideas.length === 0){
+      html += '<div class="panel"><div class="empty-state"><span class="emoji">💡</span>' +
+        '<p>還沒有存任何靈感，先新增一則，讓 AI 幫你寫初稿吧！</p>' +
+        '<button class="btn btn-primary btn-sm" data-action="add-idea">＋ 新增靈感</button></div></div>';
+    }else{
+      ideas.forEach(function(idea){ html += ideaCardHtml(idea); });
+    }
+
+    mainEl.innerHTML = html;
+    bindIdeasEvents();
+  }
+
+  function ideaCardHtml(idea){
+    var resourceHtml = "";
+    if(idea.resources && idea.resources.length){
+      resourceHtml = '<div class="resource-chips">' + idea.resources.map(function(r){
+        var icon = r.type === "image" ? "🖼️" : (r.type === "article" ? "📄" : "🔗");
+        var typeClass = r.type === "image" ? "type-image" : (r.type === "article" ? "type-article" : "");
+        return '<a class="resource-chip ' + typeClass + '" href="' + escapeHtml(r.url || "#") + '" target="_blank" rel="noopener">' +
+          icon + ' ' + escapeHtml(r.title || r.url || "資源") + '</a>';
+      }).join('') + '</div>';
+    }
+    return '<div class="idea-card" data-id="' + idea.id + '">' +
+      '<div class="idea-card-head"><div class="topic">💡 ' + escapeHtml(idea.topic || "（未命名靈感）") + '</div></div>' +
+      (idea.hook ? '<div class="field-row"><div class="field-label">HOOK</div><div class="field-text">' + escapeHtml(idea.hook) + '</div></div>' : '') +
+      (idea.content ? '<div class="field-row"><div class="field-label">主軸內容</div><div class="field-text">' + escapeHtml(truncate(idea.content, 140)) + '</div></div>' : '') +
+      (idea.cta ? '<div class="field-row"><div class="field-label">CTA</div><div class="field-text">' + escapeHtml(idea.cta) + '</div></div>' : '') +
+      resourceHtml +
+      '<div class="idea-card-actions">' +
+        '<button class="btn btn-sage btn-sm" data-action="schedule-idea" data-id="' + idea.id + '">📅 排進行事曆</button>' +
+        '<button class="btn btn-ghost btn-sm" data-action="edit-idea" data-id="' + idea.id + '">編輯</button>' +
+        '<button class="btn btn-text btn-sm" data-action="delete-idea" data-id="' + idea.id + '">刪除</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function bindIdeasEvents(){
+    mainEl.querySelectorAll('[data-action="add-idea"]').forEach(function(el){
+      el.addEventListener("click", function(){ openIdeaForm(null); });
+    });
+    mainEl.querySelectorAll('[data-action="edit-idea"]').forEach(function(el){
+      el.addEventListener("click", function(){ openIdeaForm(el.dataset.id); });
+    });
+    mainEl.querySelectorAll('[data-action="delete-idea"]').forEach(function(el){
+      el.addEventListener("click", function(){ deleteIdea(el.dataset.id); });
+    });
+    mainEl.querySelectorAll('[data-action="schedule-idea"]').forEach(function(el){
+      el.addEventListener("click", function(){ scheduleFromIdea(el.dataset.id); });
+    });
+  }
+
+  function deleteIdea(id){
+    if(!confirm("確定要刪除這則靈感嗎？此動作無法復原。")) return;
+    deleteIdeaRemote(id).then(function(){ showToast("已刪除"); }).catch(function(){ showToast("刪除失敗，請檢查網路連線"); });
+  }
+
+  function scheduleFromIdea(id){
+    var idea = ideas.find(function(x){ return x.id === id; });
+    if(!idea) return;
+    openForm(null);
+    document.getElementById("f_topic").value = idea.topic || "";
+    document.getElementById("f_hook").value = idea.hook || "";
+    document.getElementById("f_content").value = idea.content || "";
+    document.getElementById("f_cta").value = idea.cta || "";
+    showToast("已帶入靈感內容，選好日期就能儲存");
   }
 
   /* ---------------- calendar ---------------- */
@@ -745,17 +1151,16 @@
   function toggleComplete(id){
     var v = videos.find(function(x){ return x.id === id; });
     if(!v) return;
-    v.completed = !v.completed;
-    saveVideos(videos);
-    showToast(v.completed ? "太棒了，已標記完成 🎉" : "已改回未完成");
-    render();
+    var newVal = !v.completed;
+    updateVideoRemote(id, {completed: newVal}).then(function(){
+      showToast(newVal ? "太棒了，已標記完成 🎉" : "已改回未完成");
+    }).catch(function(){ showToast("更新失敗，請檢查網路連線"); });
   }
   function deleteVideo(id){
     if(!confirm("確定要刪除這則影片紀錄嗎？此動作無法復原。")) return;
-    videos = videos.filter(function(v){ return v.id !== id; });
-    saveVideos(videos);
-    showToast("已刪除");
-    render();
+    deleteVideoRemote(id).then(function(){
+      showToast("已刪除");
+    }).catch(function(){ showToast("刪除失敗，請檢查網路連線"); });
   }
 
   /* ---------------- form modal ---------------- */
@@ -825,18 +1230,181 @@
       completed: formCompleted
     };
     if(editingId){
-      var v = videos.find(function(x){ return x.id === editingId; });
-      Object.assign(v, data);
-      showToast("已更新影片內容");
+      updateVideoRemote(editingId, data).then(function(){
+        showToast("已更新影片內容");
+      }).catch(function(){ showToast("更新失敗，請檢查網路連線"); });
     }else{
-      data.id = genId();
-      data.createdAt = Date.now();
-      videos.push(data);
-      showToast("已新增到排程表 ✅");
+      addVideoRemote(data).then(function(){
+        showToast("已新增到排程表 ✅");
+      }).catch(function(){ showToast("新增失敗，請檢查網路連線"); });
     }
-    saveVideos(videos);
     closeForm();
-    render();
+  });
+
+  /* ---------------- idea form (內容發想) ---------------- */
+  var ideaOverlay = document.getElementById("ideaOverlay");
+  var ideaForm = document.getElementById("ideaForm");
+  var resourceRowsEl = document.getElementById("resourceRows");
+  var editingIdeaId = null;
+  var AI_KEY_STORAGE = "reelsPlanner_aiApiKey";
+  var AI_MODEL_STORAGE = "reelsPlanner_aiModel";
+
+  function addResourceRow(resource){
+    resource = resource || {type:"link", title:"", url:""};
+    var row = document.createElement("div");
+    row.className = "resource-row";
+    row.innerHTML =
+      '<select class="res-type">' +
+        '<option value="link"' + (resource.type === "link" ? " selected" : "") + '>🔗 連結</option>' +
+        '<option value="image"' + (resource.type === "image" ? " selected" : "") + '>🖼️ 圖片</option>' +
+        '<option value="article"' + (resource.type === "article" ? " selected" : "") + '>📄 文章</option>' +
+      '</select>' +
+      '<input type="text" class="res-title" placeholder="標題（選填）" value="' + escapeHtml(resource.title || "") + '">' +
+      '<input type="text" class="res-url" placeholder="網址 https://..." value="' + escapeHtml(resource.url || "") + '">' +
+      '<button type="button" class="resource-row-remove">✕</button>';
+    row.querySelector(".resource-row-remove").addEventListener("click", function(){ row.remove(); });
+    resourceRowsEl.appendChild(row);
+  }
+
+  document.getElementById("addResourceBtn").addEventListener("click", function(){ addResourceRow(); });
+
+  function collectResources(){
+    var rows = resourceRowsEl.querySelectorAll(".resource-row");
+    var list = [];
+    rows.forEach(function(row){
+      var url = row.querySelector(".res-url").value.trim();
+      var title = row.querySelector(".res-title").value.trim();
+      var type = row.querySelector(".res-type").value;
+      if(url) list.push({type: type, title: title, url: url});
+    });
+    return list;
+  }
+
+  function openIdeaForm(id){
+    editingIdeaId = id || null;
+    var titleEl = document.getElementById("ideaFormTitle");
+    var deleteBtn = document.getElementById("ideaDeleteBtn");
+    resourceRowsEl.innerHTML = "";
+    document.getElementById("aiStatus").className = "ai-status";
+    document.getElementById("ai_apiKey").value = localStorage.getItem(AI_KEY_STORAGE) || "";
+    document.getElementById("ai_model").value = localStorage.getItem(AI_MODEL_STORAGE) || "claude-sonnet-5";
+
+    if(editingIdeaId){
+      var idea = ideas.find(function(x){ return x.id === editingIdeaId; });
+      titleEl.textContent = "編輯靈感";
+      deleteBtn.style.display = "";
+      document.getElementById("i_topic").value = idea.topic || "";
+      document.getElementById("i_hook").value = idea.hook || "";
+      document.getElementById("i_content").value = idea.content || "";
+      document.getElementById("i_cta").value = idea.cta || "";
+      (idea.resources || []).forEach(function(r){ addResourceRow(r); });
+    }else{
+      titleEl.textContent = "新增一則靈感";
+      deleteBtn.style.display = "none";
+      ideaForm.reset();
+    }
+    ideaOverlay.classList.remove("hidden");
+    setTimeout(function(){ document.getElementById("i_topic").focus(); }, 50);
+  }
+  function closeIdeaForm(){
+    ideaOverlay.classList.add("hidden");
+    editingIdeaId = null;
+  }
+  document.getElementById("ideaCloseBtn").addEventListener("click", closeIdeaForm);
+  document.getElementById("ideaCancelBtn").addEventListener("click", closeIdeaForm);
+  ideaOverlay.addEventListener("click", function(e){ if(e.target === ideaOverlay) closeIdeaForm(); });
+  document.getElementById("ideaDeleteBtn").addEventListener("click", function(){
+    if(editingIdeaId){ var id = editingIdeaId; closeIdeaForm(); deleteIdea(id); }
+  });
+
+  ideaForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var topic = document.getElementById("i_topic").value.trim();
+    if(!topic){ showToast("請至少填寫主題／靈感"); return; }
+    var data = {
+      topic: topic,
+      hook: document.getElementById("i_hook").value.trim(),
+      content: document.getElementById("i_content").value.trim(),
+      cta: document.getElementById("i_cta").value.trim(),
+      resources: collectResources()
+    };
+    if(editingIdeaId){
+      updateIdeaRemote(editingIdeaId, data).then(function(){
+        showToast("已更新靈感");
+      }).catch(function(){ showToast("更新失敗，請檢查網路連線"); });
+    }else{
+      addIdeaRemote(data).then(function(){
+        showToast("已存進發想庫 💡");
+      }).catch(function(){ showToast("新增失敗，請檢查網路連線"); });
+    }
+    closeIdeaForm();
+  });
+
+  /* ---------------- AI 產生 Hook／內容／CTA ---------------- */
+  function setAiStatus(text, kind){
+    var el = document.getElementById("aiStatus");
+    el.textContent = text;
+    el.className = "ai-status show" + (kind ? " " + kind : "");
+  }
+
+  document.getElementById("aiGenerateBtn").addEventListener("click", function(){
+    var topic = document.getElementById("i_topic").value.trim();
+    var apiKey = document.getElementById("ai_apiKey").value.trim();
+    var model = document.getElementById("ai_model").value;
+
+    if(!topic){ showToast("請先填寫主題／靈感，AI 才知道要寫什麼"); return; }
+    if(!apiKey){ setAiStatus("請先貼上你的 Anthropic API Key", "error"); return; }
+
+    localStorage.setItem(AI_KEY_STORAGE, apiKey);
+    localStorage.setItem(AI_MODEL_STORAGE, model);
+
+    var btn = document.getElementById("aiGenerateBtn");
+    btn.disabled = true;
+    setAiStatus("🪄 AI 生成中，稍等一下...", "loading");
+
+    var prompt = "你是專門服務自由接案營養師的短影音內容顧問。請針對主題「" + topic + "」，" +
+      "設計一則 30-60 秒的短影音腳本，語氣專業但親切自然，避免誇大或醫療化的用語。" +
+      "請「只」用下面這個 JSON 格式回覆，不要加其他文字、不要加 markdown 符號：\n" +
+      '{"hook":"開頭3秒要講的一句話，要能製造好奇心或戳中痛點","content":"影片主軸內容重點，用條列方式寫3到5點","cta":"結尾的行動呼籲，引導觀眾留言、私訊或追蹤"}';
+
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 1000,
+        messages: [{role: "user", content: prompt}]
+      })
+    })
+    .then(function(res){
+      if(!res.ok){
+        return res.json().then(function(errBody){
+          throw new Error((errBody && errBody.error && errBody.error.message) || ("HTTP " + res.status));
+        });
+      }
+      return res.json();
+    })
+    .then(function(data){
+      var text = (data.content && data.content[0] && data.content[0].text) || "";
+      var cleaned = text.replace(/```json|```/g, "").trim();
+      var parsed = JSON.parse(cleaned);
+      if(parsed.hook) document.getElementById("i_hook").value = parsed.hook;
+      if(parsed.content) document.getElementById("i_content").value = parsed.content;
+      if(parsed.cta) document.getElementById("i_cta").value = parsed.cta;
+      setAiStatus("✅ AI 已產生初稿，記得檢查潤飾一下再使用", "");
+    })
+    .catch(function(err){
+      console.error(err);
+      setAiStatus("⚠️ 產生失敗：" + err.message + "（請確認 API Key、額度，或稍後再試）", "error");
+    })
+    .finally(function(){
+      btn.disabled = false;
+    });
   });
 
   /* ---------------- backup ---------------- */
@@ -849,7 +1417,8 @@
     var payload = {
       exportedAt: new Date().toISOString(),
       app: "reels-planner",
-      videos: videos
+      videos: videos,
+      ideas: ideas
     };
     var blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
     var url = URL.createObjectURL(blob);
@@ -873,13 +1442,28 @@
       try{
         var parsed = JSON.parse(e.target.result);
         var list = Array.isArray(parsed) ? parsed : parsed.videos;
+        var ideaList = Array.isArray(parsed) ? [] : (parsed.ideas || []);
         if(!Array.isArray(list)) throw new Error("格式錯誤");
-        if(!confirm("匯入將覆蓋目前裝置上的所有資料（共 " + list.length + " 筆），確定要繼續嗎？")) return;
-        videos = list;
-        saveVideos(videos);
-        backupOverlay.classList.add("hidden");
-        showToast("匯入成功，共 " + list.length + " 筆資料");
-        render();
+        if(!confirm("匯入將覆蓋雲端目前的所有資料（影片 " + list.length + " 筆、靈感 " + ideaList.length + " 筆），確定要繼續嗎？")) return;
+        Promise.all([videosCollection().get(), ideasCollection().get()]).then(function(results){
+          var batch = db.batch();
+          results[0].docs.forEach(function(d){ batch.delete(d.ref); });
+          results[1].docs.forEach(function(d){ batch.delete(d.ref); });
+          list.forEach(function(item){
+            var cleaned = Object.assign({}, item);
+            delete cleaned.id;
+            batch.set(videosCollection().doc(), cleaned);
+          });
+          ideaList.forEach(function(item){
+            var cleaned = Object.assign({}, item);
+            delete cleaned.id;
+            batch.set(ideasCollection().doc(), cleaned);
+          });
+          return batch.commit();
+        }).then(function(){
+          backupOverlay.classList.add("hidden");
+          showToast("匯入成功，共 " + list.length + " 筆影片、" + ideaList.length + " 筆靈感");
+        }).catch(function(){ showToast("匯入失敗，請檢查網路連線"); });
       }catch(err){
         alert("匯入失敗，請確認這是本工具匯出的備份檔。");
       }
@@ -942,6 +1526,12 @@
   /* ---------------- init ---------------- */
   switchTab("dashboard");
   render();
+  initAuthUI();
+  if(isConfigFilled()){
+    initFirebase();
+  }else{
+    showAuthLoading("⚠️ 還沒有設定 Firebase 連線資訊<br>請照教學把 firebaseConfig 貼到程式碼裡");
+  }
 
   /* ---------------- PWA service worker ---------------- */
   if("serviceWorker" in navigator){
