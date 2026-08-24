@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資料救援工具</title>
+<style>
+  body{font-family:-apple-system,"Noto Sans TC",sans-serif; background:#FAFAF8; color:#37352F; padding:24px; max-width:640px; margin:0 auto;}
+  h1{font-size:20px;}
+  .box{background:#fff; border:1px solid #B8CFDA; border-radius:14px; padding:18px; margin-bottom:16px;}
+  .found{color:#3E5B3F; font-weight:700;}
+  .notfound{color:#C1685D; font-weight:700;}
+  button{background:#7A9BAD; color:#fff; border:none; border-radius:999px; padding:12px 22px; font-size:15px; font-weight:700; cursor:pointer;}
+  button:disabled{opacity:0.4; cursor:not-allowed;}
+  pre{white-space:pre-wrap; word-break:break-all; background:#FAF3EE; padding:12px; border-radius:10px; font-size:12px; max-height:300px; overflow:auto;}
+  .item{border-bottom:1px solid #E3EDF3; padding:8px 0; font-size:13px;}
+</style>
+</head>
+<body>
+  <h1>🔎 舊資料救援工具</h1>
+  <div class="box" id="result">檢查中...</div>
+  <div class="box" id="listBox" style="display:none;">
+    <p>找到以下影片紀錄：</p>
+    <div id="list"></div>
+  </div>
+  <button id="downloadBtn" style="display:none;">⬇ 下載備份檔（可用「匯入備份檔」還原）</button>
+
+<script>
+  var STORAGE_KEY = "reelsPlanner_videos_v1";
+  var raw = localStorage.getItem(STORAGE_KEY);
+  var resultEl = document.getElementById("result");
+  var listBox = document.getElementById("listBox");
+  var listEl = document.getElementById("list");
+  var downloadBtn = document.getElementById("downloadBtn");
+
+  var videos = [];
+  try{ videos = raw ? JSON.parse(raw) : []; }catch(e){ videos = []; }
+
+  if(videos.length > 0){
+    resultEl.innerHTML = '<span class="found">✅ 找到 ' + videos.length + ' 筆舊資料！</span><br>這是在這個瀏覽器（這個網址）之前存下的紀錄。';
+    listBox.style.display = "";
+    videos.forEach(function(v){
+      var d = document.createElement("div");
+      d.className = "item";
+      d.textContent = (v.date || "無日期") + "｜" + (v.topic || "（未命名）");
+      listEl.appendChild(d);
+    });
+    downloadBtn.style.display = "";
+    downloadBtn.addEventListener("click", function(){
+      var payload = { exportedAt: new Date().toISOString(), app: "reels-planner", videos: videos };
+      var blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "舊資料救援備份.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }else{
+    resultEl.innerHTML = '<span class="notfound">⚠️ 這個瀏覽器裡沒有找到舊資料。</span><br>可能是因為打開這個救援工具的瀏覽器，跟你當初輸入資料時用的不是同一個（例如換了裝置、換了瀏覽器 App，或清過瀏覽器資料）。';
+  }
+</script>
+</body>
+</html>
