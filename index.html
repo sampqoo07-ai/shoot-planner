@@ -378,7 +378,11 @@
         <label for="auth_password">密碼</label>
         <input type="password" id="auth_password" placeholder="至少 6 個字元" autocomplete="current-password">
       </div>
+      <p style="text-align:right; margin:-6px 0 12px;">
+        <button type="button" id="authForgotBtn" style="background:none; border:none; padding:0; color:var(--blue); font-size:12.5px; text-decoration:underline;">忘記密碼？</button>
+      </p>
       <p id="authError" style="display:none; color:var(--danger); font-size:12.5px; margin-bottom:10px; line-height:1.5;"></p>
+      <p id="authNotice" style="display:none; background:var(--light-sage); color:var(--medium); font-size:12.5px; margin-bottom:10px; line-height:1.7; padding:10px 12px; border-radius:var(--radius-sm);"></p>
       <div class="form-actions">
         <button type="button" id="authSubmitBtn" class="btn btn-primary" style="flex:1;">登入</button>
       </div>
@@ -622,6 +626,10 @@
     var toggleBtn = document.getElementById("authToggleMode");
     var errEl = document.getElementById("authError");
     errEl.style.display = "none";
+    document.getElementById("authNotice").style.display = "none";
+    /* 忘記密碼只在登入模式顯示，註冊模式沒有意義 */
+    document.getElementById("authForgotBtn").parentNode.style.display =
+      (authMode === "login") ? "" : "none";
     if(authMode === "login"){
       title.textContent = "登入你的拍片排程本";
       submitBtn.textContent = "登入";
@@ -643,7 +651,9 @@
       "auth/email-already-in-use": "這個 Email 已經註冊過了，改成登入試試",
       "auth/weak-password": "密碼太簡單，至少要 6 個字元",
       "auth/network-request-failed": "網路連線失敗，請檢查網路後再試一次",
-      "auth/too-many-requests": "嘗試次數過多，請稍後再試"
+      "auth/too-many-requests": "嘗試次數過多，請稍後再試",
+      "auth/missing-email": "請先填入 Email",
+      "auth/user-not-found": "找不到這個帳號，請確認 Email 有沒有打錯"
     };
     return map[code] || ("發生錯誤：" + code);
   }
@@ -671,6 +681,38 @@
         errEl.style.display = "";
       });
     });
+    /* ---- 忘記密碼 ---- */
+    document.getElementById("authForgotBtn").addEventListener("click", function(){
+      var email = document.getElementById("auth_email").value.trim();
+      var errEl = document.getElementById("authError");
+      var noticeEl = document.getElementById("authNotice");
+      errEl.style.display = "none";
+      noticeEl.style.display = "none";
+
+      if(!email){
+        errEl.textContent = "請先在上面填入你的 Email，我們才知道要把重設信寄到哪裡";
+        errEl.style.display = "";
+        document.getElementById("auth_email").focus();
+        return;
+      }
+
+      var btn = document.getElementById("authForgotBtn");
+      btn.disabled = true;
+      btn.textContent = "寄送中...";
+
+      auth.sendPasswordResetEmail(email).then(function(){
+        noticeEl.innerHTML = "📬 重設密碼的信已寄出<br>請到 <b>" + escapeHtml(email) +
+          "</b> 的收件匣點信裡的連結。<br>如果幾分鐘後還沒收到，記得看一下<b>垃圾郵件</b>。";
+        noticeEl.style.display = "";
+      }).catch(function(err){
+        errEl.textContent = translateAuthError(err.code);
+        errEl.style.display = "";
+      }).finally(function(){
+        btn.disabled = false;
+        btn.textContent = "忘記密碼？";
+      });
+    });
+
     document.getElementById("logoutBtn").addEventListener("click", function(){
       if(confirm("確定要登出嗎？")) auth.signOut();
     });
