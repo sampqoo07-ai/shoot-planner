@@ -343,6 +343,7 @@
       </div>
       <div class="topbar-actions">
         <span id="syncStatus" style="font-size:11.5px; color:var(--medium); align-self:center;"></span>
+        <button id="btnIcs" class="btn btn-ghost">📅 行事曆</button>
         <button id="btnBackup" class="btn btn-ghost">📦 備份</button>
         <button id="btnAdd" class="btn btn-primary">＋ 新增影片</button>
       </div>
@@ -489,6 +490,38 @@
         <button type="submit" class="btn btn-primary">儲存靈感</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- 加進手機行事曆 -->
+<div id="icsOverlay" class="overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <h3>📅 加進手機行事曆</h3>
+      <button class="modal-close" id="icsCloseBtn">✕</button>
+    </div>
+    <p class="backup-desc">
+      把排定的拍片行程匯出成行事曆檔，加進 iPhone／Google 行事曆後，
+      <b>前一天晚上 8 點和當天早上 8 點</b>手機會自己跳通知提醒你要拍片——
+      不用打開這個網頁也會提醒。
+    </p>
+    <div class="form-group">
+      <label class="form-check" style="font-weight:400; font-size:13px;">
+        <input type="checkbox" id="ics_publish" checked> 連發布日一起匯出
+      </label>
+      <label class="form-check" style="font-weight:400; font-size:13px;">
+        <input type="checkbox" id="ics_done"> 包含已完成的影片
+      </label>
+    </div>
+    <div class="backup-row">
+      <button id="icsDownloadBtn" class="btn btn-sage">⬇ 匯出行事曆檔（.ics）</button>
+    </div>
+    <p class="backup-desc" style="margin-top:10px; font-size:12px; line-height:1.7;">
+      <b>怎麼用：</b><br>
+      • <b>iPhone</b>：點匯出後選「儲存到『檔案』」，再到「檔案」App 點一下那個檔案 →「加入全部」。<br>
+      • <b>Google 行事曆</b>：電腦版右上角齒輪 → 設定 → 匯入與匯出 → 選這個檔案。<br>
+      • 排程改了就再匯出一次，同一則影片會被更新，不會重複新增。
+    </p>
   </div>
 </div>
 
@@ -1405,6 +1438,149 @@
     .finally(function(){
       btn.disabled = false;
     });
+  });
+
+  /* ---------------- 加進手機行事曆（.ics 匯出） ---------------- */
+  var icsOverlay = document.getElementById("icsOverlay");
+  document.getElementById("btnIcs").addEventListener("click", function(){ icsOverlay.classList.remove("hidden"); });
+  document.getElementById("icsCloseBtn").addEventListener("click", function(){ icsOverlay.classList.add("hidden"); });
+  icsOverlay.addEventListener("click", function(e){ if(e.target === icsOverlay) icsOverlay.classList.add("hidden"); });
+
+  function icsEscape(str){
+    return String(str == null ? "" : str)
+      .replace(/\\/g, "\\\\")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\r?\n/g, "\\n");
+  }
+  function utf8Bytes(ch){
+    var c = ch.codePointAt(0);
+    if(c < 0x80) return 1;
+    if(c < 0x800) return 2;
+    if(c < 0x10000) return 3;
+    return 4;
+  }
+  /* RFC 5545 規定每行不超過 75 個位元組。中文一個字佔 3 個位元組，
+     所以要按位元組數折行，而且不能把一個字切成兩半。 */
+  function icsFold(line){
+    var out = [], cur = "", bytes = 0, limit = 73;
+    for(var i = 0; i < line.length; i++){
+      var ch = line[i];
+      if(line.codePointAt(i) > 0xFFFF){ ch = line.slice(i, i + 2); i++; }
+      var b = utf8Bytes(ch);
+      if(bytes + b > limit){ out.push(cur); cur = " "; bytes = 1; }
+      cur += ch; bytes += b;
+    }
+    out.push(cur);
+    return out.join("\r\n");
+  }
+  function icsDate(ymd){ return String(ymd).replace(/-/g, ""); }
+  function icsNextDay(ymd){
+    var p = String(ymd).split("-");
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + 1);
+    return formatDate(d).replace(/-/g, "");
+  }
+  function icsStamp(){
+    return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  }
+
+  function buildIcsEvent(opts){
+    var lines = [];
+    lines.push("BEGIN:VEVENT");
+    lines.push("UID:" + opts.uid);
+    lines.push("DTSTAMP:" + icsStamp());
+    lines.push("DTSTART;VALUE=DATE:" + icsDate(opts.date));
+    lines.push("DTEND;VALUE=DATE:" + icsNextDay(opts.date));
+    lines.push("SUMMARY:" + icsEscape(opts.summary));
+    if(opts.description) lines.push("DESCRIPTION:" + icsEscape(opts.description));
+    lines.push("TRANSP:TRANSPARENT");
+    /* 全天事件的起點是當天 00:00，所以 -PT4H = 前一晚 20:00，PT8H = 當天 08:00 */
+    lines.push("BEGIN:VALARM");
+    lines.push("ACTION:DISPLAY");
+    lines.push("TRIGGER:-PT4H");
+    lines.push("DESCRIPTION:" + icsEscape(opts.alarmEve));
+    lines.push("END:VALARM");
+    lines.push("BEGIN:VALARM");
+    lines.push("ACTION:DISPLAY");
+    lines.push("TRIGGER:PT8H");
+    lines.push("DESCRIPTION:" + icsEscape(opts.alarmDay));
+    lines.push("END:VALARM");
+    lines.push("END:VEVENT");
+    return lines;
+  }
+
+  function buildIcs(includePublish, includeDone){
+    var lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//shoot-planner//拍片排程小助手//ZH-TW",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:🎬 拍片排程",
+      "X-WR-TIMEZONE:Asia/Taipei"
+    ];
+    var count = 0;
+
+    videos.forEach(function(v){
+      if(!v.date || !v.topic) return;
+      if(v.completed && !includeDone) return;
+
+      var detail = [];
+      if(v.hook) detail.push("【Hook】" + v.hook);
+      if(v.content) detail.push("【內容】" + v.content);
+      if(v.cta) detail.push("【CTA】" + v.cta);
+      if(v.publishDate) detail.push("預計發布：" + v.publishDate);
+      var description = detail.join("\n");
+
+      lines = lines.concat(buildIcsEvent({
+        uid: v.id + "-shoot@shoot-planner",
+        date: v.date,
+        summary: "🎬 拍片：" + v.topic,
+        description: description,
+        alarmEve: "明天要拍「" + v.topic + "」，今晚先把腳本看一遍～",
+        alarmDay: "今天要拍「" + v.topic + "」，開工囉！"
+      }));
+      count++;
+
+      if(includePublish && v.publishDate){
+        lines = lines.concat(buildIcsEvent({
+          uid: v.id + "-publish@shoot-planner",
+          date: v.publishDate,
+          summary: "📤 發布：" + v.topic,
+          description: description,
+          alarmEve: "明天要發「" + v.topic + "」，確認一下剪好了沒～",
+          alarmDay: "今天要發「" + v.topic + "」囉！"
+        }));
+        count++;
+      }
+    });
+
+    lines.push("END:VCALENDAR");
+    return { text: lines.map(icsFold).join("\r\n") + "\r\n", count: count };
+  }
+
+  document.getElementById("icsDownloadBtn").addEventListener("click", function(){
+    var result = buildIcs(
+      document.getElementById("ics_publish").checked,
+      document.getElementById("ics_done").checked
+    );
+
+    if(result.count === 0){
+      showToast("還沒有可匯出的行程，先去新增幾則影片吧～");
+      return;
+    }
+
+    var blob = new Blob([result.text], {type: "text/calendar;charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "拍片排程_" + todayStr() + ".ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+
+    showToast("已匯出 " + result.count + " 個行程，去行事曆匯入吧！");
   });
 
   /* ---------------- backup ---------------- */
