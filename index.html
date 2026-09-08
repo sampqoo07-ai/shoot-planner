@@ -1450,11 +1450,16 @@
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true"
       },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 1000,
-        messages: [{role: "user", content: prompt}]
-      })
+      body: JSON.stringify(function(){
+        var b = {
+          model: model,
+          max_tokens: 4000,
+          messages: [{role: "user", content: prompt}]
+        };
+        // Sonnet 5 支援 effort，設 low 可以少花思考 token；Haiku 4.5 不支援，送了會報錯
+        if(model.indexOf("haiku") === -1){ b.output_config = {effort: "low"}; }
+        return b;
+      }())
     })
     .then(function(res){
       if(!res.ok){
@@ -1465,8 +1470,19 @@
       return res.json();
     })
     .then(function(data){
-      var text = (data.content && data.content[0] && data.content[0].text) || "";
-      var cleaned = text.replace(/```json|```/g, "").trim();
+      // 新版模型會先回一個 thinking 區塊，不能寫死抓 content[0]，要找出 type 為 text 的那塊
+      var text = "";
+      if(data.content){
+        for(var i = 0; i < data.content.length; i++){
+          if(data.content[i].type === "text" && data.content[i].text){ text = data.content[i].text; break; }
+        }
+      }
+      if(!text){
+        throw new Error(data.stop_reason === "max_tokens" ? "回應被截斷了，請再按一次" : "AI 沒有回傳內容，請再按一次");
+      }
+      var cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      var first = cleaned.indexOf("{"), last = cleaned.lastIndexOf("}");
+      if(first !== -1 && last > first){ cleaned = cleaned.slice(first, last + 1); }
       var parsed = JSON.parse(cleaned);
       if(parsed.hook) document.getElementById("i_hook").value = parsed.hook;
       if(parsed.content) document.getElementById("i_content").value = parsed.content;
