@@ -458,6 +458,10 @@
       <div class="ai-box">
         <div class="ai-row">
           <input type="password" id="ai_apiKey" placeholder="貼上你的 Anthropic API Key（sk-ant-...）" style="flex:1; min-width:180px;">
+          <select id="ai_identity">
+            <option value="personal">汗娜營養師（個人）</option>
+            <option value="company">好所宅診所（公司）</option>
+          </select>
           <select id="ai_model">
             <option value="claude-sonnet-5">Claude Sonnet 5（品質較佳）</option>
             <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5（較快較省）</option>
@@ -507,27 +511,41 @@
       <button class="modal-close" id="profileCloseBtn">✕</button>
     </div>
     <p class="backup-desc">
-      把你自己的內容準則寫在這裡，<b>設定一次就好</b>。
-      之後每次按「🪄 用 AI 幫我寫」，AI 都會先讀這份準則再動筆，
-      寫出來的東西才會像你、而不是像一般的罐頭腳本。
+      把內容準則寫在這裡，<b>設定一次就好</b>。
+      之後每次按「🪄 用 AI 幫我寫」，AI 會先讀你在那裡選的身分所對應的準則再動筆，
+      寫出來的東西才會像你、而不是罐頭腳本。
+      <b>個人和公司分開寫</b>，兩邊不會互相影響。
     </p>
     <div class="form-group">
-      <label for="profileText">我的準則</label>
-      <textarea class="tall" id="profileText" rows="14" placeholder="還沒想好可以先空著，之後隨時回來填。
+      <label for="profileText">① 汗娜營養師（個人 IP）</label>
+      <textarea class="tall" id="profileText" rows="12" placeholder="還沒想好可以先空著，之後隨時回來填。
 
 寫「規則」比寫「文章」有效，例如：
 
+【我是誰】
+- 五大標籤：……
+
 【Hook 原則】
-- 前 3 秒要有具體數字或反常識的說法
+- 前 3 秒要有具體場景，不要空泛
 - 不要用「你知道嗎」開頭
 
-【內容結構】
-- 一則只講一個重點，不要貪心
-- 每一點都要有生活化的例子
-
 【CTA】
-- 不要說「記得追蹤」，要給具體行動
-- 引導留言關鍵字，不要引導私訊"></textarea>
+- 不要說「記得追蹤」，要給具體行動"></textarea>
+    </div>
+    <div class="form-group">
+      <label for="profileTextCompany">② 好所宅診所（公司 IP）</label>
+      <textarea class="tall" id="profileTextCompany" rows="12" placeholder="公司帳號的定位與準則寫這裡，跟個人的完全分開。
+
+例如：
+
+【這個帳號是誰】
+- 台灣的居家醫療診所……
+
+【內容目的】
+- 徵才、科普居家醫療、建立信任感
+
+【語氣】
+- 代表團隊發言，不是個人口吻"></textarea>
     </div>
     <div class="backup-row">
       <button id="profileSaveBtn" class="btn btn-primary">儲存心法</button>
@@ -821,7 +839,18 @@
   /* ---------- 我的腳本心法 ----------
      注意：Firestore 規則是四段式 users/{uid}/{集合}/{文件}，
      沒有涵蓋 users/{uid} 本身，所以一定要存成子集合，不能直接寫在使用者文件上。 */
-  var promptProfile = "";
+  var IDENTITIES = {
+    personal: {
+      label: "汗娜營養師（個人）",
+      fallback: "你正在協助一位在台灣從事居家營養與居家護理的營養師經營個人品牌帳號。"
+    },
+    company: {
+      label: "好所宅診所（公司）",
+      fallback: "你正在協助一間台灣的居家醫療診所經營品牌帳號，內容目的包含科普居家醫療能做的事、徵才與建立信任感。"
+    }
+  };
+  var AI_IDENTITY_STORAGE = "reelsPlanner_aiIdentity";
+  var promptProfiles = {personal: "", company: ""};
   var unsubscribeProfile = null;
   function profileDoc(){
     return db.collection("users").doc(currentUser.uid).collection("settings").doc("promptProfile");
@@ -829,14 +858,23 @@
   function subscribeProfile(){
     if(unsubscribeProfile) unsubscribeProfile();
     unsubscribeProfile = profileDoc().onSnapshot(function(doc){
-      promptProfile = (doc.exists && doc.data().text) ? doc.data().text : "";
+      var d = doc.exists ? doc.data() : {};
+      // 舊版只有單一 text 欄位，視為個人 IP 的心法
+      promptProfiles.personal = d.personal || d.text || "";
+      promptProfiles.company = d.company || "";
     }, function(err){ console.error(err); });
   }
-  function saveProfileRemote(text){
+  function saveProfileRemote(personalText, companyText){
     return profileDoc().set({
-      text: text,
+      personal: personalText,
+      company: companyText,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+  }
+  function currentIdentity(){
+    var el = document.getElementById("ai_identity");
+    var v = el ? el.value : (localStorage.getItem(AI_IDENTITY_STORAGE) || "personal");
+    return IDENTITIES[v] ? v : "personal";
   }
 
   function initFirebase(){
@@ -859,7 +897,7 @@
         if(unsubscribeProfile){ unsubscribeProfile(); unsubscribeProfile = null; }
         videos = [];
         ideas = [];
-        promptProfile = "";
+        promptProfiles = {personal: "", company: ""};
         showAuthForm();
       }
     });
@@ -1429,6 +1467,7 @@
     resourceRowsEl.innerHTML = "";
     document.getElementById("aiStatus").className = "ai-status";
     document.getElementById("ai_apiKey").value = localStorage.getItem(AI_KEY_STORAGE) || "";
+    document.getElementById("ai_identity").value = localStorage.getItem(AI_IDENTITY_STORAGE) || "personal";
     document.getElementById("ai_model").value = localStorage.getItem(AI_MODEL_STORAGE) || "claude-sonnet-5";
 
     if(editingIdeaId){
@@ -1497,21 +1536,23 @@
     if(!topic){ showToast("請先填寫主題／靈感，AI 才知道要寫什麼"); return; }
     if(!apiKey){ setAiStatus("請先貼上你的 Anthropic API Key", "error"); return; }
 
+    var identity = currentIdentity();
     localStorage.setItem(AI_KEY_STORAGE, apiKey);
     localStorage.setItem(AI_MODEL_STORAGE, model);
+    localStorage.setItem(AI_IDENTITY_STORAGE, identity);
 
     var btn = document.getElementById("aiGenerateBtn");
     btn.disabled = true;
     setAiStatus("🪄 AI 生成中，稍等一下...", "loading");
 
-    var profileBlock = "";
-    if(promptProfile && promptProfile.trim()){
-      profileBlock = "以下是這位創作者自己整理的內容準則，請務必嚴格遵守；若與一般作法有衝突，一律以這份準則為準：\n" +
-        promptProfile.trim() + "\n\n";
-    }
+    // 身分決定要套哪一份心法；沒寫心法時退回該身分的預設描述
+    var profileText = (promptProfiles[identity] || "").trim();
+    var profileBlock = profileText
+      ? "以下是這個帳號的定位與內容準則，請務必嚴格遵守；若與一般作法有衝突，一律以這份準則為準：\n" + profileText + "\n\n"
+      : IDENTITIES[identity].fallback + "\n\n";
 
-    var prompt = profileBlock + "你是專門服務自由接案營養師的短影音內容顧問。請針對主題「" + topic + "」，" +
-      "設計一則 30-60 秒的短影音腳本，語氣專業但親切自然，避免誇大或醫療化的用語。" +
+    var prompt = profileBlock + "你是短影音內容顧問。請針對主題「" + topic + "」，" +
+      "設計一則 30-60 秒的短影音腳本，語氣專業但親切自然，避免誇大不實或沒有依據的療效宣稱。" +
       "請「只」用下面這個 JSON 格式回覆，不要加其他文字、不要加 markdown 符號：\n" +
       '{"hook":"開頭3秒要講的一句話，要能製造好奇心或戳中痛點","content":"影片主軸內容重點，用條列方式寫3到5點","cta":"結尾的行動呼籲，引導觀眾留言、私訊或追蹤"}';
 
@@ -1560,7 +1601,8 @@
       if(parsed.hook) document.getElementById("i_hook").value = parsed.hook;
       if(parsed.content) document.getElementById("i_content").value = parsed.content;
       if(parsed.cta) document.getElementById("i_cta").value = parsed.cta;
-      setAiStatus((promptProfile && promptProfile.trim() ? "✅ AI 已依你的心法產生初稿" : "✅ AI 已產生初稿") + "，記得檢查潤飾一下再使用", "");
+      setAiStatus("✅ 已用【" + IDENTITIES[identity].label + "】" +
+        (profileText ? "的心法" : "（尚未設定心法）") + "產生初稿，記得檢查潤飾一下再使用", "");
     })
     .catch(function(err){
       console.error(err);
@@ -1579,7 +1621,8 @@
     el.className = "ai-status" + (text ? " show" : "") + (kind ? " " + kind : "");
   }
   function openProfile(){
-    document.getElementById("profileText").value = promptProfile || "";
+    document.getElementById("profileText").value = promptProfiles.personal || "";
+    document.getElementById("profileTextCompany").value = promptProfiles.company || "";
     setProfileStatus("", "");
     profileOverlay.classList.remove("hidden");
   }
@@ -1590,12 +1633,14 @@
 
   document.getElementById("profileSaveBtn").addEventListener("click", function(){
     var btn = this;
-    var text = document.getElementById("profileText").value.trim();
+    var personalText = document.getElementById("profileText").value.trim();
+    var companyText = document.getElementById("profileTextCompany").value.trim();
     btn.disabled = true;
     setProfileStatus("儲存中...", "loading");
-    saveProfileRemote(text).then(function(){
-      promptProfile = text;
-      showToast(text ? "心法已儲存，之後 AI 生成都會自動帶入" : "心法已清空");
+    saveProfileRemote(personalText, companyText).then(function(){
+      promptProfiles.personal = personalText;
+      promptProfiles.company = companyText;
+      showToast((personalText || companyText) ? "心法已儲存，之後 AI 生成都會自動帶入" : "心法已清空");
       closeProfile();
     }).catch(function(err){
       console.error(err);
@@ -1605,7 +1650,8 @@
 
   document.getElementById("profileClearBtn").addEventListener("click", function(){
     document.getElementById("profileText").value = "";
-    setProfileStatus("已清空，記得按「儲存心法」才會生效", "");
+    document.getElementById("profileTextCompany").value = "";
+    setProfileStatus("兩欄都已清空，記得按「儲存心法」才會生效", "");
   });
 
   /* ---------------- 加進手機行事曆（.ics 匯出） ---------------- */
