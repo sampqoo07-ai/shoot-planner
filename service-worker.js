@@ -1,4 +1,4 @@
-const CACHE_NAME = "reels-planner-cache-v7";
+const CACHE_NAME = "reels-planner-cache-v8";
 const ASSETS = [
   "./index.html",
   "./manifest.json",

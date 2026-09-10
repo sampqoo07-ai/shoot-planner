@@ -1393,7 +1393,7 @@
   document.getElementById("formDeleteBtn").addEventListener("click", function(){
     if(editingId){ closeForm(); deleteVideo(editingId); }
   });
-  formOverlay.addEventListener("click", function(e){ if(e.target === formOverlay) closeForm(); });
+  // 刻意不做「點背景關閉」：這張表單有逐字稿等長輸入，誤觸會整份消失。要關請用 ✕ 或「取消」。
 
   videoForm.addEventListener("submit", function(e){
     e.preventDefault();
@@ -1493,7 +1493,7 @@
   }
   document.getElementById("ideaCloseBtn").addEventListener("click", closeIdeaForm);
   document.getElementById("ideaCancelBtn").addEventListener("click", closeIdeaForm);
-  ideaOverlay.addEventListener("click", function(e){ if(e.target === ideaOverlay) closeIdeaForm(); });
+  // 刻意不做「點背景關閉」：理由同影片表單，避免誤觸吃掉已輸入內容。
   document.getElementById("ideaDeleteBtn").addEventListener("click", function(){
     if(editingIdeaId){ var id = editingIdeaId; closeIdeaForm(); deleteIdea(id); }
   });
@@ -1629,7 +1629,7 @@
   function closeProfile(){ profileOverlay.classList.add("hidden"); }
   document.getElementById("btnProfile").addEventListener("click", openProfile);
   document.getElementById("profileCloseBtn").addEventListener("click", closeProfile);
-  profileOverlay.addEventListener("click", function(e){ if(e.target === profileOverlay) closeProfile(); });
+  // 刻意不做「點背景關閉」：心法是長文，誤觸會整份消失。
 
   document.getElementById("profileSaveBtn").addEventListener("click", function(){
     var btn = this;
