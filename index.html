@@ -338,7 +338,7 @@
         <span class="brand-icon">🎬</span>
         <div>
           <h1 class="brand-title">拍片排程小助手</h1>
-          <p class="brand-sub">內容排好，就不怕自己偷懶</p>
+          <p class="brand-sub">內容排好，就不怕自己偷懶 <span id="appBuild" style="opacity:.55;"></span></p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -850,6 +850,7 @@
     }
   };
   var AI_IDENTITY_STORAGE = "reelsPlanner_aiIdentity";
+  var APP_BUILD = "v10";
   var promptProfiles = {personal: "", company: ""};
   var unsubscribeProfile = null;
   /* AI 設定（API key／模型／身分）存 Firestore，跟帳號走。
@@ -879,13 +880,17 @@
     }, function(err){ console.error(err); });
   }
   function saveAiConfigRemote(apiKey, model, identity){
-    if(!currentUser) return Promise.resolve();
+    if(!currentUser) return Promise.resolve({ok:false, reason:"尚未登入"});
     return aiConfigDoc().set({
       apiKey: apiKey,
       model: model,
       identity: identity,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(function(err){ console.error(err); });
+    }).then(function(){ return {ok:true}; })
+      .catch(function(err){
+        console.error("aiConfig 寫入失敗", err);
+        return {ok:false, reason: (err && (err.code || err.message)) || "未知錯誤"};
+      });
   }
   // 統一的儲存入口：本機先寫、雲端跟著寫。apiKey 空白時不覆蓋既有設定。
   function persistAiConfig(apiKey, model, identity){
@@ -897,7 +902,10 @@
     if(!apiKey) return;
     if(aiConfig.apiKey === apiKey && aiConfig.model === model && aiConfig.identity === identity) return;
     aiConfig = {apiKey: apiKey, model: model, identity: identity};
-    saveAiConfigRemote(apiKey, model, identity);
+    return saveAiConfigRemote(apiKey, model, identity).then(function(r){
+      if(!r.ok) showToast("⚠️ key 沒能同步到帳號（" + r.reason + "），只存在這台裝置");
+      return r;
+    });
   }
   function profileDoc(){
     return db.collection("users").doc(currentUser.uid).collection("settings").doc("promptProfile");
@@ -955,6 +963,11 @@
   }
 
   /* ---------------- date helpers ---------------- */
+  (function(){
+    var el = document.getElementById("appBuild");
+    if(el) el.textContent = "· " + APP_BUILD;
+  })();
+
   function pad(n){ return n < 10 ? "0"+n : ""+n; }
   function formatDate(d){
     return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
@@ -1518,6 +1531,9 @@
     resourceRowsEl.innerHTML = "";
     document.getElementById("aiStatus").className = "ai-status";
     document.getElementById("ai_apiKey").value = aiConfig.apiKey || localStorage.getItem(AI_KEY_STORAGE) || "";
+    // 診斷用：一眼看出 key 是從雲端帳號來、只在這台裝置、還是根本沒存過
+    var keyFrom = aiConfig.apiKey ? "雲端帳號 ✓" : (localStorage.getItem(AI_KEY_STORAGE) ? "只在這台裝置" : "沒有存過");
+    setAiStatus("API key 來源：" + keyFrom + "　|　版本 " + APP_BUILD, "");
     document.getElementById("ai_identity").value = aiConfig.identity || localStorage.getItem(AI_IDENTITY_STORAGE) || "personal";
     document.getElementById("ai_model").value = aiConfig.model || localStorage.getItem(AI_MODEL_STORAGE) || "claude-sonnet-5";
 
