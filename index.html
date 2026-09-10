@@ -852,6 +852,53 @@
   var AI_IDENTITY_STORAGE = "reelsPlanner_aiIdentity";
   var promptProfiles = {personal: "", company: ""};
   var unsubscribeProfile = null;
+  /* AI 設定（API key／模型／身分）存 Firestore，跟帳號走。
+     localStorage 只當離線快取：iOS 會在系統清理時清掉 PWA 的 localStorage，
+     以前只存本機，被清掉就要重貼 key。 */
+  var aiConfig = {apiKey: "", model: "", identity: ""};
+  var unsubscribeAiConfig = null;
+  function aiConfigDoc(){
+    return db.collection("users").doc(currentUser.uid).collection("settings").doc("aiConfig");
+  }
+  function subscribeAiConfig(){
+    if(unsubscribeAiConfig) unsubscribeAiConfig();
+    unsubscribeAiConfig = aiConfigDoc().onSnapshot(function(doc){
+      var d = doc.exists ? doc.data() : {};
+      if(!d.apiKey) return;
+      aiConfig = {apiKey: d.apiKey || "", model: d.model || "", identity: d.identity || ""};
+      try{
+        localStorage.setItem(AI_KEY_STORAGE, aiConfig.apiKey);
+        if(aiConfig.model) localStorage.setItem(AI_MODEL_STORAGE, aiConfig.model);
+        if(aiConfig.identity) localStorage.setItem(AI_IDENTITY_STORAGE, aiConfig.identity);
+      }catch(e){ /* 隱私模式寫不進去也沒關係，雲端那份才是主的 */ }
+      // 表單已經開著、key 欄位還空的話直接補上
+      var keyEl = document.getElementById("ai_apiKey");
+      if(keyEl && !keyEl.value && ideaOverlay && !ideaOverlay.classList.contains("hidden")){
+        keyEl.value = aiConfig.apiKey;
+      }
+    }, function(err){ console.error(err); });
+  }
+  function saveAiConfigRemote(apiKey, model, identity){
+    if(!currentUser) return Promise.resolve();
+    return aiConfigDoc().set({
+      apiKey: apiKey,
+      model: model,
+      identity: identity,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(err){ console.error(err); });
+  }
+  // 統一的儲存入口：本機先寫、雲端跟著寫。apiKey 空白時不覆蓋既有設定。
+  function persistAiConfig(apiKey, model, identity){
+    try{
+      if(model) localStorage.setItem(AI_MODEL_STORAGE, model);
+      if(identity) localStorage.setItem(AI_IDENTITY_STORAGE, identity);
+      if(apiKey) localStorage.setItem(AI_KEY_STORAGE, apiKey);
+    }catch(e){}
+    if(!apiKey) return;
+    if(aiConfig.apiKey === apiKey && aiConfig.model === model && aiConfig.identity === identity) return;
+    aiConfig = {apiKey: apiKey, model: model, identity: identity};
+    saveAiConfigRemote(apiKey, model, identity);
+  }
   function profileDoc(){
     return db.collection("users").doc(currentUser.uid).collection("settings").doc("promptProfile");
   }
@@ -890,14 +937,18 @@
         subscribeVideos();
         subscribeIdeas();
         subscribeProfile();
+        subscribeAiConfig();
       }else{
         currentUser = null;
         if(unsubscribeVideos){ unsubscribeVideos(); unsubscribeVideos = null; }
         if(unsubscribeIdeas){ unsubscribeIdeas(); unsubscribeIdeas = null; }
         if(unsubscribeProfile){ unsubscribeProfile(); unsubscribeProfile = null; }
+        if(unsubscribeAiConfig){ unsubscribeAiConfig(); unsubscribeAiConfig = null; }
         videos = [];
         ideas = [];
         promptProfiles = {personal: "", company: ""};
+        aiConfig = {apiKey: "", model: "", identity: ""};
+        try{ localStorage.removeItem(AI_KEY_STORAGE); }catch(e){}
         showAuthForm();
       }
     });
@@ -1466,9 +1517,9 @@
     var deleteBtn = document.getElementById("ideaDeleteBtn");
     resourceRowsEl.innerHTML = "";
     document.getElementById("aiStatus").className = "ai-status";
-    document.getElementById("ai_apiKey").value = localStorage.getItem(AI_KEY_STORAGE) || "";
-    document.getElementById("ai_identity").value = localStorage.getItem(AI_IDENTITY_STORAGE) || "personal";
-    document.getElementById("ai_model").value = localStorage.getItem(AI_MODEL_STORAGE) || "claude-sonnet-5";
+    document.getElementById("ai_apiKey").value = aiConfig.apiKey || localStorage.getItem(AI_KEY_STORAGE) || "";
+    document.getElementById("ai_identity").value = aiConfig.identity || localStorage.getItem(AI_IDENTITY_STORAGE) || "personal";
+    document.getElementById("ai_model").value = aiConfig.model || localStorage.getItem(AI_MODEL_STORAGE) || "claude-sonnet-5";
 
     if(editingIdeaId){
       var idea = ideas.find(function(x){ return x.id === editingIdeaId; });
@@ -1488,6 +1539,9 @@
     setTimeout(function(){ document.getElementById("i_topic").focus(); }, 50);
   }
   function closeIdeaForm(){
+    // 關掉前先記住 key：貼了 key 但還沒按生成就關掉，以前這把 key 會整個丟掉
+    var keyEl = document.getElementById("ai_apiKey");
+    if(keyEl) persistAiConfig(keyEl.value.trim(), document.getElementById("ai_model").value, currentIdentity());
     ideaOverlay.classList.add("hidden");
     editingIdeaId = null;
   }
@@ -1533,13 +1587,12 @@
     var apiKey = document.getElementById("ai_apiKey").value.trim();
     var model = document.getElementById("ai_model").value;
 
+    var identity = currentIdentity();
+    // 先存再檢查：以前存在檢查後面，主題沒填被擋下時 key 不會被記住，下次要重貼
+    persistAiConfig(apiKey, model, identity);
+
     if(!topic){ showToast("請先填寫主題／靈感，AI 才知道要寫什麼"); return; }
     if(!apiKey){ setAiStatus("請先貼上你的 Anthropic API Key", "error"); return; }
-
-    var identity = currentIdentity();
-    localStorage.setItem(AI_KEY_STORAGE, apiKey);
-    localStorage.setItem(AI_MODEL_STORAGE, model);
-    localStorage.setItem(AI_IDENTITY_STORAGE, identity);
 
     var btn = document.getElementById("aiGenerateBtn");
     btn.disabled = true;
